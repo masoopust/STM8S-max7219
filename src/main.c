@@ -21,6 +21,18 @@
 #define CS_HIGH GPIO_WriteHigh(CS_GPIO, CS_PIN)
 #define CS_LOW GPIO_WriteLow(CS_GPIO, CS_PIN)
 
+uint32_t vlastni_cas = 0;
+
+/* Funkce co setupne TIM2*/
+void TIM2_init(void)
+{
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2,ENABLE);
+    TIM2_TimeBaseInit(TIM2_PRESCALER_16,999);
+    TIM2_ClearFlag(TIM2_FLAG_UPDATE);
+    TIM2_ITConfig(TIM2_IT_UPDATE,ENABLE);
+    TIM2_Cmd(ENABLE);
+}
+
 /*Funkce co posílá data */
 void max7219_send(uint8_t address, uint8_t data)
 {
@@ -75,7 +87,7 @@ void max7219_init(void)
     max7219_send(DECODE_MODE, DECODE_ALL);        // Dekodér
     max7219_send(SCAN_LIMIT, 4);                  // Kolik cifer zapneme +1
     max7219_send(INTENSITY, 5);                   // Jas
-    max7219_send(DISPLAY_TEST, DISPLAY_TEST_OFF); // test displeje
+    max7219_send(DISPLAY_TEST, DISPLAY_TEST_OFF); // Test displeje
     max7219_send(SHUTDOWN, SHUTDOWN_ON);           // On/OFF
 
 }
@@ -84,9 +96,10 @@ void setup(void)
 {
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1); // taktovat MCU na 16MHz
 
-    init_milis();
+   // init_milis();
     
-
+    TIM2_init();
+    enableInterrupts();
     max7219_init();
 }
 
@@ -114,9 +127,9 @@ int main(void)
     /* Funkce pro zobrazení čísel */
     while (1)
     {
-        if ((milis() - time) > 200)
+        if ((vlastni_cas - time) > 200)
         {
-            time = milis();
+            time = vlastni_cas;
             max7219_send(DIGIT0, number);
             max7219_send(DIGIT1, desitky);
             max7219_send(DIGIT2, stovky);
@@ -148,7 +161,7 @@ int main(void)
 
         }
     
-    
+     
     }
 }
 

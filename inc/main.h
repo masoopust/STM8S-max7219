@@ -1,3 +1,4 @@
+#include "stdint.h"
 #ifndef _MAIN_H_
 #define _MAIN_H_ 1
 
@@ -38,5 +39,8 @@
 
 // functions
 void init(void);
+
+// deklarace vlastni_cas
+extern uint32_t vlastni_cas;
 
 #endif // !_MAIN_H_
