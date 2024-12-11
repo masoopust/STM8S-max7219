@@ -120,7 +120,7 @@ int main(void)
     uint32_t time = 0;
     uint8_t number = 0;
     uint8_t number1 = 0;
-    uint8_t desitky = 0;
+    uint8_t desitky = 0;  
     uint8_t stovky = 0;
     uint8_t tisice = 0;
 

@@ -22,23 +22,29 @@ STLINK=stlinkv21
 F_CPU=16000000
 
 ifeq ($(OS),Windows_NT)
-	CC_ROOT = "/c/Program Files/SDCC"
-	STVP_ROOT = "/c/Program Files (x86)/STMicroelectronics/st_toolset/stvp"
+  CC_ROOT = /c/Program Files/SDCC
+  PATH := $(CC_ROOT)/bin:$(PATH)
+  CC = /c/Program\\ Files/SDCC/bin/sdcc
+  AR = /c/Program\\ Files/SDCC/bin/sdar
+  
+  STVP_ROOT = "/c/Program Files (x86)/STMicroelectronics/st_toolset/stvp"
 else
-	#CC_ROOT = /usr
-	#CC_ROOT = /usr/local
-	CC_ROOT = /usr/local/stow/sdcc-4.4.0
-	#CC_ROOT = /usr/local/stow/sdcc-gas
+  #CC_ROOT = /usr
+  #CC_ROOT = /usr/local
+  CC_ROOT = /usr/local/stow/sdcc-4.4.0
+  #CC_ROOT = /usr/local/stow/sdcc-gas
+
+  CC = $(CC_ROOT)/bin/sdcc
+  AR = $(CC_ROOT)/bin/sdar
+  ifeq ($(wildcard $(CC)),)
+    CC = sdcc
+  endif
+  ifeq ($(wildcard $(AR)),)
+    AR = sdar
+  endif
 endif
 ######################################################################################
-CC = $(CC_ROOT)/bin/sdcc
-AR = $(CC_ROOT)/bin/sdar
-ifeq ($(wildcard $(CC)),)
-	CC = sdcc
-endif
-ifeq ($(wildcard $(AR)),)
-	AR = sdar
-endif
+
 
 #DEVICE=STM8S103
 DEVICE=$(shell bash .make/device $(DEVICE_FLASH))
@@ -80,10 +86,10 @@ endif
 # trap handling requires SDCC >=v3.4.3
 SKIP_TRAPS = 1
 
-# set compiler path & parameters
-#CFLAGS  = -mstm8 -lstm8 --opt-code-size
+# set compiler path & parameters 
+#CFLAGS  = -mstm8 -lstm8 --opt-code-size 
 CFLAGS  = -mstm8 -lstm8 --opt-code-size --nogcse --all-callee-saves --stack-auto --fverbose-asm --float-reent --no-peep
-#CFLAGS += --std-sdcc99
+#CFLAGS += --std-sdcc99 
 CFLAGS += --std-sdcc2x
 #CFLAGS += --disable-warning 283
 CFLAGS += -I inc
@@ -123,7 +129,7 @@ SPL_INC_DIR = ../SPLSPL/inc/
 #SPL_SRC_DIR = ../SPL-$(DEVICE)/src/
 #SPL_INC_DIR = ../SPL-$(DEVICE)/inc/
 # add all library sources used here singly ... or all .c files in SPL src dir
-#SPL_SOURCE  = stm8s_gpio.c stm8s_clk.c stm8s_tim4.c stm8s_itc.c
+#SPL_SOURCE  = stm8s_gpio.c stm8s_clk.c stm8s_tim4.c stm8s_itc.c 
 #SPL_SOURCE += stm8s_uart1.c
 #SPL_SOURCE += stm8s_adc2.c
 #SPL_SOURCE += stm8s_flash.c
@@ -132,7 +138,7 @@ SPL_INC_DIR = ../SPLSPL/inc/
 #SPL_SOURCE += stm8s_tim3.c
 #SPL_SOURCE  = $(notdir $(wildcard $(SPL_SRC_DIR)/*.c))
 ifneq ($(wildcard ../SPLSPL),)
-	include ../SPLSPL/mk/$(DEVICE).mk
+	include ../SPLSPL/mk/$(DEVICE).mk  # zde se definuje proměnná $(SPL_SOURCE_PREFIX)
 else
 start: spl
 endif
@@ -142,15 +148,15 @@ SPL_OBJECTS := $(addprefix $(OUTPUT_SPL_DIR)/, $(SPL_SOURCE:.c=.rel))
 SPL_OBJECTS_ELF := $(addprefix $(OUTPUT_SPL_DIR_ELF)/, $(SPL_SOURCE:.c=.rel))
 
 # collect all include folders
-INCLUDE = -I$(PRJ_INC_DIR) -I$(SPL_INC_DIR)
+INCLUDE = -I$(PRJ_INC_DIR) -I$(SPL_INC_DIR) 
 
 # collect all source directories
 VPATH=$(PRJ_SRC_DIR):$(SPL_SRC_DIR)
 
 .PHONY: ihx elf all
 
-ihx: $(TARGET)
-elf: $(TARGET_ELF)
+ihx: compile_commands.json  $(TARGET)
+elf: compile_commands.json  $(TARGET_ELF)
 all: ihx elf
 
 $(TARGET_ELF): $(PRJ_OBJECTS_ELF)  $(SPLLIB_ELF)
@@ -169,19 +175,30 @@ $(OUTPUT_DIR)/%.rel: %.c $(PRJ_INCS) Makefile | $(OUTPUT_DIR) ../SPLSPL
 $(OUTPUT_DIR_ELF)/%.rel: %.c $(PRJ_INCS) Makefile | $(OUTPUT_DIR_ELF) ../SPLSPL
 	$(CC) $(CFLAGS) $(FMT_ELF) -D$(DEVICE) $(INCLUDE) -DSKIP_TRAPS=$(SKIP_TRAPS) -c $< -o $@ 2>&1 | $(PYTHON) .make/recolor.py; exit $${PIPESTATUS[0]}
 
-$(OUTPUT_SPL_DIR)/%.rel: %.c $(PRJ_INCS) Makefile | $(OUTPUT_SPL_DIR) ../SPLSPL
+$(OUTPUT_SPL_DIR)/%.rel: %.c $(PRJ_INCS)  | $(OUTPUT_SPL_DIR) ../SPLSPL
 	$(CC) $(CFLAGS) -D$(DEVICE) $(INCLUDE) -DSKIP_TRAPS=$(SKIP_TRAPS) -c $< -o $@ 2>&1 | $(PYTHON) .make/recolor.py; exit $${PIPESTATUS[0]}
-$(OUTPUT_SPL_DIR_ELF)/%.rel: %.c $(PRJ_INCS) Makefile | $(OUTPUT_SPL_DIR_ELF) ../SPLSPL
+$(OUTPUT_SPL_DIR_ELF)/%.rel: %.c $(PRJ_INCS)  | $(OUTPUT_SPL_DIR_ELF) ../SPLSPL
 	$(CC) $(CFLAGS) $(FMT_ELF) -D$(DEVICE) $(INCLUDE) -DSKIP_TRAPS=$(SKIP_TRAPS) -c $< -o $@ 2>&1 | $(PYTHON) .make/recolor.py; exit $${PIPESTATUS[0]}
 
 
 ifeq ($(wildcard $(SPLLIB)),)
 $(SPLLIB): $(SPL_OBJECTS) | $(OUTPUT_SPL_DIR)
-	$(AR) -rc $(SPLLIB) $^
+	@rm -f objects.list
+	@echo -n "Procesing: "
+	@for prefix in $(SPL_SOURCE_PREFIX); do \
+         echo -n "$$prefix "; \
+         ls $(OUTPUT_SPL_DIR)/$$prefix*.rel >> objects.list; \
+    done;
+	@echo -e "\nCreating library $(SPLLIB)"
+	$(AR) -rc $(SPLLIB) @objects.list
+	@rm -f objects.list
 endif
+
 ifeq ($(wildcard $(SPLLIB_ELF)),)
 $(SPLLIB_ELF): $(SPL_OBJECTS_ELF) | $(OUTPUT_SPL_DIR_ELF)
-	$(AR) -rc $(SPLLIB_ELF) $^
+	@echo $(SPL_OBJECTS) > objects.list
+	$(AR) -rc $(SPLLIB_ELF) @objects.list
+	@rm objects.list
 endif
 
 
@@ -206,6 +223,9 @@ clean:
 	rm -f out-$(DEVICE).ihex
 	rm -Rf $(OUTPUT_DIR)
 	rm -Rf $(OUTPUT_DIR_ELF)
+	rm -f compile_commands.json
+
+clean-spl: clean-spl-lib
 
 clean-spl-objects:
 	rm -Rf $(OUTPUT_SPL_DIR)
@@ -215,7 +235,7 @@ clean-spl-lib: clean-spl-objects
 	rm -f $(SPLLIB)
 	rm -f $(SPLLIB_ELF)
 
-cleanall: clean-spl-objects clean
+cleanall: clean-spl-lib clean 
 
 
 .PHONY: flash flash-elf flash-ihex stm8flash rebuild reflash
@@ -246,7 +266,7 @@ reflash: clean
 	$(MAKE) flash
 
 
-.PHONY: openocd debug switch-sdccrm switch-sdcc-gas
+.PHONY: openocd debug switch-sdccrm switch-sdcc-gas 
 
 openocd:
 	+$(OPENOCD) -c "init" -c "reset halt"
@@ -276,9 +296,10 @@ switch-sdccrm: clean
 spl: ../SPL ../SPLSPL
 
 spl-renew:
-	rm -Rf ../SPL*
+	rm -Rf ../SPL* 
 	$(MAKE) spl
 
 tree:
 	+bash .make/tree.sh
+
 
